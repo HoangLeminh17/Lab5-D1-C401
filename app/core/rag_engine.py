@@ -11,7 +11,7 @@ import google.generativeai as genai
 import pandas as pd
 from dotenv import load_dotenv
 
-from fda_api import get_full_fda_info
+from app.tools.fda import get_full_fda_info
 
 # Cấu hình logging
 logging.basicConfig(level=logging.INFO)
@@ -209,7 +209,6 @@ Luôn ưu tiên an toàn bệnh nhân. Nếu có nghi ngờ, hãy khuyến ngh�
         
         # Tạo user message
         user_message = f"""{fda_summary}
-
 **YÊU CẦU:**
 Hãy tư vấn DỰA TRÊN thông tin trên. Dịch các cảnh báo quan trọng sang tiếng Việt. Format bằng Markdown. Gợi ý thuốc nào tốt nhất và tại sao."""
         

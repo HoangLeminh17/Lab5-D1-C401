@@ -16,7 +16,7 @@ def test_fda_api():
     print("="*60)
     
     try:
-        from fda_api import get_full_fda_info
+        from app.tools.fda import get_full_fda_info
         
         print("✓ Module import thành công")
         
@@ -49,7 +49,7 @@ def test_rag_engine():
     print("="*60)
     
     try:
-        from rag_engine import load_inventory, find_alternative_drugs
+        from app.core.rag_engine import load_inventory, find_alternative_drugs
         
         print("✓ Module import thành công")
         

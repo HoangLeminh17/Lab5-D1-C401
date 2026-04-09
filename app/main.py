@@ -6,7 +6,7 @@ Giao diện cho hệ thống gợi ý thuốc thay thế dùng Google Gemini API
 import streamlit as st
 import logging
 import os
-from rag_engine import get_clinical_recommendation
+from app.core.rag_engine import get_clinical_recommendation
 from datetime import datetime
 from dotenv import load_dotenv
 

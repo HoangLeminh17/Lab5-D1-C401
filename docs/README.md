@@ -76,7 +76,7 @@ Drug/
 ### Chạy ứng dụng Streamlit:
 
 ```bash
-streamlit run app.py
+python -m streamlit run main.py
 ```
 
 Ứng dụng sẽ mở tại: `http://localhost:8501`
@@ -148,7 +148,7 @@ result = get_clinical_recommendation("Advil")
 - 📋 Format Markdown cho dễ đọc
 - ⚠️ Ưu tiên an toàn bệnh nhân
 
-### 3. `app.py` - Streamlit UI
+### 3. `main.py` - Streamlit UI
 
 **Các thành phần:**
 - 🔐 Đọc Google Gemini API Key từ file `.env`
