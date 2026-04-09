@@ -185,3 +185,10 @@ def run_pipeline(image_path: str, inventory_path: str = str(INVENTORY_FILE)) -> 
     logger.info(f"HOÀN TẤT | {len(drugs)} thuốc OCR'd | {len(results)} thuốc kiểm kho")
     logger.info("=" * 55)
     return {"drugs": drugs, "results": results, "error": None}
+
+if __name__ == "__main__":
+    test_image = "C:/Users/ADMIN/Desktop/OIP.jpg"
+    result = run_pipeline(test_image)
+
+    print("\n=== KET QUA ===")
+    print(json.dumps(result, ensure_ascii=False, indent=2))
