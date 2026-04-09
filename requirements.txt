@@ -4,7 +4,8 @@ pandas==2.1.4
 requests==2.31.0
 
 # LLM Integration
-google-generativeai==0.3.0
+openai>=1.30.0
 
 # Utilities
 python-dotenv==1.0.0
+Pillow==10.2.0
