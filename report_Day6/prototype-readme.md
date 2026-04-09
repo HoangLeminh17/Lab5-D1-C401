@@ -20,7 +20,7 @@ Dược sĩ nhập tên một loại thuốc, hệ thống sẽ đưa ra một v
 | Thành viên | Phần | Output |
 |-----------|------|--------|
 | Đăng Hải | Canvas + failure modes | spec/spec-final.md phần 1, 4 |
-| Tuấn Hưng | User stories 4 paths + prompt engineering | spec/spec-final.md phần 2, prototype/prompt-tests.md |
+| Tuấn Hưng | Backend + Data Engineer | ./app/data |
 | Trung Hậu | Eval metrics + ROI + demo slides | spec/spec-final.md phần 3, 5, demo/slides.pdf |
 | Bảo Ngọc | UI prototype + demo script | prototype/, demo/demo-script.md |
 | Minh Hoàng | UI prototype + demo script | prototype/, demo/demo-script.md |
