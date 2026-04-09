@@ -1,7 +1,7 @@
 import os
 from langchain_google_genai import ChatGoogleGenerativeAI
 from app.tools.fda import get_full_fda_info
-from app.tools.interaction_checker import check_interaction_rxnav
+from app.tools.interaction_checker import check_interaction_openfda
 from langchain.agents import create_agent
 from dotenv import load_dotenv
 load_dotenv()
@@ -18,7 +18,7 @@ Hãy:
 
 Luôn ưu tiên an toàn bệnh nhân. Nếu có nghi ngờ, hãy khuyến nghị bệnh nhân tham khảo bác sĩ."""
 # Danh sách tools cho Agent
-tools = [get_full_fda_info, check_interaction_rxnav]
+tools = [get_full_fda_info, check_interaction_openfda]
 
 # LLM hỗ trợ gọi tool (function calling)
 llm = ChatGoogleGenerativeAI(
