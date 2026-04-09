@@ -1,7 +1,7 @@
 # SPEC — AI Product Hackathon
 
 **Nhóm:** D1-C401
-**Track:** ☐ VinFast · ☐ Vinmec · ☐ VinUni-VinSchool · ☐ XanhSM · ☑ Open
+**Track:** ☐ VinFast · ☑ Vinmec · ☐ VinUni-VinSchool · ☐ XanhSM · ☐ Open
 **Problem statement (1 câu):** Dược sĩ quầy thuốc cần tìm nhanh thuốc thay thế, chuẩn hóa tên thuốc và kiểm tra tương tác trong toa; chatbot AI dùng OpenFDA + RxNorm + tồn kho nội bộ để gợi ý còn hàng, cảnh báo rủi ro và rút ngắn thời gian tư vấn.
 
 ---
