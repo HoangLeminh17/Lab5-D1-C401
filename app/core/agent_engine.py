@@ -12,12 +12,14 @@ from app.tools.fda import get_full_fda_info
 from app.tools.interaction_checker import check_interaction_openfda
 from langchain.agents import create_agent
 from app.core.config import CLINICAL_SYSTEM_PROMPT, get_core_config
+from app.tools.check_name_drug import get_us_standard_name
+
 
 CORE_CONFIG = get_core_config()
 
 system_prompt = CLINICAL_SYSTEM_PROMPT
 # Danh sách tools cho Agent
-tools = [get_full_fda_info, check_interaction_openfda]
+tools = [get_full_fda_info, check_interaction_openfda, get_us_standard_name]
 
 # LLM hỗ trợ gọi tool (function calling)
 llm = ChatGoogleGenerativeAI(

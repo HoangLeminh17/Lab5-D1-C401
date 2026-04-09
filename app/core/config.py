@@ -9,7 +9,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 
-CLINICAL_SYSTEM_PROMPT = """Bạn là một DƯỢC SĨ LÂM SÀNG CẤP CAO với 20 năm kinh nghiệm.
+CLINICAL_SYSTEM_PROMPT = """Bạn là một DƯỢC SĨ LÂM SÀNG CẤP CAO chuyên về tư vấn thuốc.
 Nhiệm vụ của bạn là tư vấn các nhân viên quầy thuốc khi cần tìm thuốc thay thế.
 
 Hãy:
