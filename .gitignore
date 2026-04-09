@@ -1,7 +1,21 @@
-# Environment
+# Dependencies
+**/node_modules/
+**/package-lock.json
+!front-end/package-lock.json
+
+# Next.js Build
+**/.next/
+**/out/
+next-env.d.ts
+
+# Environment Files
 .env
 .env.local
+.env.development.local
+.env.test.local
+.env.production.local
 .env.*.local
+front-end/.env*
 
 # Python
 __pycache__/
@@ -27,26 +41,29 @@ wheels/
 
 # Virtual Environment
 venv/
+.venv/
 ENV/
 env/
 
-# IDE
+# IDE & OS
 .vscode/
 .idea/
+.DS_Store
+Thumbs.db
 *.swp
 *.swo
 *~
-.DS_Store
 
-# Project-specific
-.streamlit/
+# Logs
 logs/
 *.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Testing
+# Project Specific
+.streamlit/
 .pytest_cache/
 .coverage
 htmlcov/
-
-# OS
-Thumbs.db
+.pnpm-debug.log
