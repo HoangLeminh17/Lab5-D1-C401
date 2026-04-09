@@ -19,7 +19,7 @@ Dược sĩ nhập tên một loại thuốc, hệ thống sẽ đưa ra một v
 ## Phân công
 | Thành viên | Phần | Output |
 |-----------|------|--------|
-| Đăng Hải | Define scope, design user flow, build logic drug | User flow, acceptance criteria, replacement logic |
+| Đăng Hải | Define scope, design user flow, build logic drug | fda.py, agent_engine.py  |
 | Tuấn Hưng | Backend + Data Engineer | ./app/data |
 | Trung Hậu | Eval metrics + ROI + demo slides | spec/spec-final.md phần 3, 5, demo/slides.pdf |
 | Bảo Ngọc | UI prototype + demo script | prototype/, demo/demo-script.md |
