@@ -6,41 +6,46 @@ import itertools
 
 logger = logging.getLogger(__name__)
 
-
-def get_us_standard_name(drug_name: str) -> str:
-    """Sử dụng RxNorm API để chuẩn hóa 1 tên thuốc sang tên Mỹ."""
-    try:
-        search_url = "https://rxnav.nlm.nih.gov/REST/approximateTerm.json"
-        search_res = requests.get(search_url, params={"term": drug_name, "maxEntries": 1}).json()
-
-        candidates = search_res.get("approximateGroup", {}).get("candidate", [])
-        if not candidates:
-            return drug_name.lower()
-
-        rxcui = candidates[0].get("rxcui")
-        prop_url = f"https://rxnav.nlm.nih.gov/REST/rxcui/{rxcui}/properties.json"
-        prop_res = requests.get(prop_url).json()
-
-        properties = prop_res.get("properties")
-        if properties and "name" in properties:
-            standard_name = properties["name"].lower()
-            logger.info(f"🔄 Đổi tên: {drug_name} -> {standard_name}")
-            return standard_name
-    except Exception as e:
-        logger.warning(f"Lỗi đổi tên cho {drug_name}: {str(e)}")
-
-    return drug_name.lower()
-
-
 @tool
 def check_interaction_openfda(drug_list: List[str]) -> Dict[str, Any]:
-    """Kiểm tra tương tác của một toa thuốc (bao nhiêu thuốc cũng được) bằng OpenFDA API"""
+    """
+    Kiểm tra tương tác giữa nhiều thuốc bằng cách truy vấn dữ liệu nhãn thuốc từ OpenFDA API.
 
+    Tool này nhận vào danh sách các tên thuốc (có thể là brand name hoặc generic name)
+    và kiểm tra tương tác từng cặp thuốc bằng cách tìm kiếm trong trường
+    "drug_interactions" của nhãn thuốc trong OpenFDA.
+
+    Cách hoạt động:
+    - Tự động tạo tất cả các cặp thuốc có thể từ danh sách đầu vào
+    - Với mỗi cặp (A, B), tool sẽ:
+      + Kiểm tra xem nhãn của thuốc A có đề cập đến tương tác với thuốc B không
+      + Nếu không có, sẽ kiểm tra ngược lại (B với A)
+    - Nếu tìm thấy, trả về đoạn cảnh báo tương tác từ FDA label
+
+    Lưu ý quan trọng:
+    - OpenFDA chỉ chứa thông tin từ nhãn thuốc, KHÔNG phải là cơ sở dữ liệu tương tác đầy đủ
+    - Nếu không tìm thấy dữ liệu (404), điều đó KHÔNG đảm bảo rằng hai thuốc an toàn khi dùng chung
+    - Kết quả chỉ mang tính tham khảo
+
+    Khi nào nên dùng tool này:
+    - Khi cần kiểm tra tương tác giữa nhiều thuốc trong một toa
+    - Sau khi đã chuẩn hóa tên thuốc (nếu có thể) để tăng độ chính xác
+
+    Args:
+        drug_list (List[str]): Danh sách tên thuốc (ít nhất 2 thuốc)
+
+    Returns:
+        Dict[str, Any]:
+            - success (bool): Trạng thái thực thi
+            - message (str): Tóm tắt kết quả cho từng cặp thuốc
+            - interactions (List[Dict]): Danh sách các cặp có tương tác, gồm:
+                + pair (str): Tên 2 thuốc
+                + warning_text (str): Nội dung cảnh báo từ FDA
+    """
     if not drug_list or len(drug_list) < 2:
         return {"success": False, "message": "Cần ít nhất 2 thuốc để kiểm tra tương tác", "interactions": []}
 
-    # 1. Chuyển đổi TOÀN BỘ danh sách sang tên chuẩn Mỹ
-    fda_drugs = [get_us_standard_name(drug) for drug in drug_list]
+    fda_drugs = [drug for drug in drug_list]
 
     # Loại bỏ trùng lặp (phòng trường hợp user nhập 2 thuốc giống nhau)
     fda_drugs = list(set(fda_drugs))
