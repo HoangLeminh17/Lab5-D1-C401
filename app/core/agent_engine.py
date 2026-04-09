@@ -2,12 +2,12 @@
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langgraph.prebuilt import create_react_agent
 from app.tools.fda import get_full_fda_info
-from app.tools.interaction_checker import find_inventory_tool
+from app.tools.interaction_checker import check_interaction_rxnav
 
 system_prompt = ""
 
 # Danh sách tools cho Agent
-tools = [get_full_fda_info, find_inventory_tool]
+tools = [get_full_fda_info, check_interaction_rxnav]
 
 # LLM hỗ trợ gọi tool (function calling)
 llm = ChatGoogleGenerativeAI(model="gemini-2.5-flash")
