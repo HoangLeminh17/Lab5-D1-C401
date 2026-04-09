@@ -1,0 +1,25 @@
+{
+  "nguon_file_output": "output/demo_image_20260409_103857.json",
+  "so_luong_ban_ghi": 2,
+  "created_at": "2026-04-09T10:55:20",
+  "results": [
+    {
+      "ten_thuoc": "Cefprozil",
+      "lieu_luong": "250mg",
+      "full_name": "Cefprozil 250mg",
+      "co_trong_db_theo_full_name": true,
+      "ton_kho_theo_full_name": "100",
+      "co_trong_db_theo_ten_thuoc": false,
+      "ton_kho_theo_ten_thuoc": "KHONG_TIM_THAY"
+    },
+    {
+      "ten_thuoc": "Alfuzosin",
+      "lieu_luong": "10mg",
+      "full_name": "Alfuzosin 10mg",
+      "co_trong_db_theo_full_name": true,
+      "ton_kho_theo_full_name": "0",
+      "co_trong_db_theo_ten_thuoc": false,
+      "ton_kho_theo_ten_thuoc": "KHONG_TIM_THAY"
+    }
+  ]
+}
