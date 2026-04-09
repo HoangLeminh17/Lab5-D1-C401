@@ -68,16 +68,13 @@ def _load_inventory(inventory_path: Path, logger: logging.Logger) -> dict[str, s
     if not inventory_path.exists():
         logger.error(f"Không tìm thấy file inventory: {inventory_path}")
         raise FileNotFoundError(f"Không tìm thấy file inventory: {inventory_path}")
-
     stock: dict[str, str] = {}
     with open(inventory_path, "r", encoding="utf-8-sig", newline="") as f:
         for row in csv.DictReader(f):
             name = row.get("Ten_Thuoc", "").strip()
             if name:
                 stock[name] = row.get("Ton_Kho", "").strip()
-
     logger.info(f"Tải thành công {len(stock)} mặt hàng từ inventory.")
-    logger.debug(f"Danh sách thuốc trong kho: {list(stock.keys())}")
     return stock
 
 # BƯỚC 3 — OCR ẢNH (Gemini Vision)
@@ -106,7 +103,6 @@ def _extract_drugs(model: GenerativeModel, image_path: Path, logger: logging.Log
 
     # Làm sạch nếu Gemini bọc markdown ```json ... ```
     cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw_text, flags=re.MULTILINE).strip()
-
     try:
         drugs = json.loads(cleaned)
         if not isinstance(drugs, list):
@@ -168,12 +164,10 @@ def run_pipeline(image_path: str, inventory_path: str = str(INVENTORY_FILE)) -> 
     if img.suffix.lower() not in SUPPORTED_FORMATS:
         logger.error(f"Định dạng ảnh không hỗ trợ: {img.suffix}")
         return {"drugs": [], "results": [], "error": f"Unsupported image format: {img.suffix}"}
-
     try:
         model = _setup_gemini(logger)
     except EnvironmentError as e:
         return {"drugs": [], "results": [], "error": str(e)}
-
     try:
         stock = _load_inventory(Path(inventory_path), logger)
     except FileNotFoundError as e:
