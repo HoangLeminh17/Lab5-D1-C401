@@ -1,0 +1,18 @@
+{
+  "source_ocr_file": "output\\demo_image_20260409_123149.json",
+  "timestamp": "2026-04-09T12:31:49.273438",
+  "results": [
+    {
+      "full_name": "Cefprozil 250mg",
+      "co_trong_db": true,
+      "ton_kho": "100",
+      "trang_thai": "CÒN HÀNG — tồn kho: 100"
+    },
+    {
+      "full_name": "Alfuzosin 10mg",
+      "co_trong_db": true,
+      "ton_kho": "0",
+      "trang_thai": "HẾT HÀNG — tồn kho: 0"
+    }
+  ]
+}
