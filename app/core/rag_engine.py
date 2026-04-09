@@ -11,7 +11,7 @@ import google.generativeai as genai
 import pandas as pd
 from dotenv import load_dotenv
 
-from app.tools.fda import get_full_fda_info
+from app.tools.fda import get_full_fda_info, find_alternative_drugs
 
 # Cấu hình logging
 logging.basicConfig(level=logging.INFO)
@@ -85,7 +85,7 @@ def get_clinical_recommendation(
         
         # Bước 2: Tra cứu FDA API
         logger.info("📍 [Bước 2] Tra cứu FDA API...")
-        fda_info = get_full_fda_info(thuoc_het_hang)
+        fda_info = get_full_fda_info.invoke({"brand_name": thuoc_het_hang})
         
         if not fda_info["success"]:
             result["error_message"] = f"Không tìm thấy thông tin thuốc '{thuoc_het_hang}' trên FDA API"

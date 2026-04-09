@@ -5,6 +5,7 @@ Tra cứu: Hoạt chất, Đường dùng, Chỉ định, Chống chỉ định,
 import os
 import requests
 import logging
+from pathlib import Path
 from typing import Dict, Optional, List, Any
 from langchain.tools import tool
 import pandas as pd
@@ -22,6 +23,35 @@ INVENTORY_PATH = os.getenv("INVENTORY_PATH", "inventory.csv")
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
+
+def resolve_inventory_path() -> Path:
+    """Tìm đường dẫn inventory ổn định dù chạy từ cwd nào."""
+    configured = INVENTORY_PATH.strip() if INVENTORY_PATH else ""
+
+    # Ưu tiên path được cấu hình (absolute hoặc relative theo cwd hiện tại)
+    candidates: List[Path] = []
+    if configured:
+        cfg_path = Path(configured)
+        candidates.append(cfg_path)
+        if not cfg_path.is_absolute():
+            candidates.append(Path.cwd() / cfg_path)
+
+    # Fallback theo cấu trúc project hiện tại
+    module_dir = Path(__file__).resolve().parent  # app/tools
+    project_root = module_dir.parents[1]          # repo root
+    candidates.extend([
+        project_root / "app" / "data" / "inventory.csv",
+        project_root / "inventory.csv",
+        module_dir.parent / "data" / "inventory.csv",  # app/data/inventory.csv
+    ])
+
+    for candidate in candidates:
+        if candidate.exists() and candidate.is_file():
+            return candidate
+
+    # Trả candidate đầu tiên để log dễ hiểu nếu không file nào tồn tại
+    return candidates[0] if candidates else Path("inventory.csv")
+
 def load_inventory() -> pd.DataFrame:
     """
     Load file inventory.csv vào DataFrame
@@ -30,11 +60,12 @@ def load_inventory() -> pd.DataFrame:
         pd.DataFrame: DataFrame với các cột Ten_Thuoc, Hoat_Chat, Ton_Kho
     """
     try:
-        df = pd.read_csv(INVENTORY_PATH)
-        logger.info(f"✅ Load inventory thành công: {len(df)} dòng")
+        inventory_path = resolve_inventory_path()
+        df = pd.read_csv(inventory_path)
+        logger.info(f"✅ Load inventory thành công: {len(df)} dòng | file={inventory_path}")
         return df
     except FileNotFoundError:
-        logger.error(f"❌ Không tìm thấy file: {INVENTORY_PATH}")
+        logger.error(f"❌ Không tìm thấy file inventory. INVENTORY_PATH={INVENTORY_PATH} | cwd={Path.cwd()}")
         return pd.DataFrame()
     except Exception as e:
         logger.error(f"❌ Lỗi load inventory: {str(e)}")
