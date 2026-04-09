@@ -2,12 +2,12 @@
 Module FDA API Integration - Lấy thông tin chi tiết từ OpenFDA
 Tra cứu: Hoạt chất, Đường dùng, Chỉ định, Chống chỉ định, Tác dụng phụ
 """
-
+import os
 import requests
 import logging
-from typing import Dict, Optional
+from typing import Dict, Optional, List, Any
 from langchain.tools import tool
-
+import pandas as pd
 
 # Cấu hình logging
 logging.basicConfig(level=logging.INFO)
@@ -17,6 +17,10 @@ logger = logging.getLogger(__name__)
 FDA_API_BASE_URL = "https://api.fda.gov/drug/label.json"
 API_TIMEOUT = 10  # seconds
 
+# Cấu hình từ env
+INVENTORY_PATH = os.getenv("INVENTORY_PATH", "inventory.csv")
+GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 def load_inventory() -> pd.DataFrame:
     """
@@ -81,7 +85,7 @@ def find_alternative_drugs(active_ingredient: str) -> List[Dict]:
         return []
 
 @tool
-def get_full_fda_info(brand_name: str) -> Dict[str, Optional[str]]:
+def get_full_fda_info(brand_name: str):
     """
     Tra cứu thông tin CHI TIẾT của thuốc từ OpenFDA API.
     
@@ -100,7 +104,7 @@ def get_full_fda_info(brand_name: str) -> Dict[str, Optional[str]]:
             "success": True
         }
     """
-    result = {
+    result: Dict[str, Any] = {
         "Hoat_Chat": None,
         "Duong_Dung": None,
         "Chi_Dinh": None,
@@ -217,7 +221,7 @@ def get_full_fda_info(brand_name: str) -> Dict[str, Optional[str]]:
 
 if __name__ == "__main__":
     # Test
-    result = get_full_fda_info("Advil")
+    result = get_full_fda_info.invoke({"brand_name": "Advil"})
     print("Success:", result["success"])
     print("Hoat_Chat:", result["Hoat_Chat"])
     print("Duong_Dung:", result["Duong_Dung"])
