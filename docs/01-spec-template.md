@@ -66,15 +66,14 @@ Mỗi feature chính = 1 bảng. AI trả lời xong → chuyện gì xảy ra?
 
 ## 3. Eval metrics + threshold
 
-**Optimize precision hay recall?** ☐ Precision · ☐ Recall
-Tại sao? Với bài toán dược, dược sĩ hoặc bác sĩ luôn là người verify cuối cùng nên một con số precision/recall đơn lẻ không đủ phản ánh chất lượng. Hệ thống nên được đánh giá theo mức độ an toàn, độ hữu ích của gợi ý, và tỷ lệ case cần bác sĩ/dược sĩ can thiệp lại.
-Nếu sai ngược lại thì chuyện gì xảy ra? Nếu chỉ bám precision/recall, hệ thống có thể trông “đẹp số” nhưng vẫn nguy hiểm ở các case hiếm hoặc case không có dữ liệu. Vì vậy, ưu tiên là không bỏ sót cảnh báo nguy hiểm và không tạo cảm giác an toàn giả.
+**Optimize precision hay recall?** ☑ Precision · ☐ Recall
+Tại sao? Bài toán thuốc ưu tiên an toàn hơn độ phủ. Sai sót kiểu gợi ý nhầm hoặc bỏ sót cảnh báo có thể gây hại cho bệnh nhân, nên cần precision cao và chấp nhận recall thấp hơn một chút để dược sĩ có thể kiểm tra thủ công.
+Nếu sai ngược lại thì chuyện gì xảy ra? Nếu chỉ tối ưu recall mà precision thấp, hệ thống sẽ trả quá nhiều gợi ý hoặc cảnh báo nhiễu, làm dược sĩ mất niềm tin và bỏ dùng. Nếu ngược lại precision cao nhưng recall thấp, hệ thống có thể bỏ sót một phần kết quả nhưng vẫn an toàn hơn vì có fallback thủ công.
 
 | Metric | Threshold | Red flag (dừng khi) |
 |--------|-----------|---------------------|
-| Critical warning miss rate trên bộ case được chuyên gia duyệt | 0% | Chỉ cần 1 case miss nghiêm trọng |
-| Tỷ lệ gợi ý được dược sĩ/bác sĩ chấp nhận trên top-3 | ≥80% | <65% trong 2 tuần |
-| Tỷ lệ case phải sửa lại do tên thuốc/hoạt chất bị hiểu sai | ≤5% | >10% liên tục |
+| Precision của thuốc thay thế đúng hoạt chất trên bộ test nội bộ | ≥92% | <85% trong 1 tuần |
+| Recall cảnh báo tương tác thuốc nguy hiểm trên bộ case curated | ≥95% | Bất kỳ critical miss nào trong bộ kiểm thử |
 | P95 latency end-to-end cho một lượt tư vấn | ≤5 giây | >8 giây hoặc timeout API lặp lại >5% |
 
 ---
@@ -97,7 +96,7 @@ Liệt kê cách product có thể fail — không phải list features.
 |   | Conservative | Realistic | Optimistic |
 |---|-------------|-----------|------------|
 | **Assumption** | 50 lượt/ngày, 40% chấp nhận gợi ý, mỗi lượt tiết kiệm 2 phút | 200 lượt/ngày, 70% chấp nhận, mỗi lượt tiết kiệm 4 phút | 500 lượt/ngày, 85% chấp nhận, mỗi lượt tiết kiệm 5 phút |
-| **Cost** | ~$0.5-$1/ngày, chủ yếu là Gemini inference + hạ tầng nhẹ | ~$2-$4/ngày, OpenFDA và RxNorm là free, chi phí gần như chỉ ở Gemini | ~$5-$10/ngày, nếu traffic tăng và response dài hơn |
+| **Cost** | ~$3/ngày cho API + vận hành nhẹ | ~$10/ngày | ~$25/ngày |
 | **Benefit** | Tiết kiệm khoảng 40 phút công tư vấn/ngày và giảm sai sót tra cứu thủ công | Tiết kiệm khoảng 9 giờ công/ngày, tăng tốc độ phục vụ quầy | Tiết kiệm hơn 30 giờ công/ngày, giảm đáng kể thời gian chờ và tăng throughput |
 | **Net** | Dương nhẹ, phù hợp pilot nhỏ | Dương rõ rệt, đủ lý do mở rộng | Dương mạnh, có thể trở thành workflow mặc định |
 
