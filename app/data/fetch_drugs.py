@@ -123,7 +123,7 @@ def fetch_drug_data():
     return all_drugs
 
 
-def save_to_csv(drugs):
+def save_to_csv(drugs, output_file=OUTPUT_FILE):
     try:
         fieldnames = [
             "brand_name",
@@ -141,14 +141,14 @@ def save_to_csv(drugs):
             if d.get("brand_name", "").strip() and d.get("generic_name", "").strip()
         ]
 
-        with open(OUTPUT_FILE, "w", newline="", encoding="utf-8") as csvfile:
+        with open(output_file, "w", newline="", encoding="utf-8") as csvfile:
             writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
             writer.writeheader()
             for row in valid_drugs:
                 writer.writerow(row)
 
         print("\n" + "=" * 60)
-        print(f"SUCCESS: Saved {len(valid_drugs)} records to {OUTPUT_FILE}")
+        print(f"SUCCESS: Saved {len(valid_drugs)} records to {output_file}")
         print("=" * 60)
         return True
 

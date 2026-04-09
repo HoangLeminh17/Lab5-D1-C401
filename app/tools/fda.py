@@ -9,6 +9,8 @@ from typing import Dict, Optional, List, Any
 from langchain.tools import tool
 import pandas as pd
 
+from app.data.fetch_drugs import fetch_drug_data, save_to_csv
+
 # Cấu hình logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -18,67 +20,128 @@ FDA_API_BASE_URL = "https://api.fda.gov/drug/label.json"
 API_TIMEOUT = 10  # seconds
 
 # Cấu hình từ env
-INVENTORY_PATH = os.getenv("INVENTORY_PATH", "inventory.csv")
+DRUG_DB_PATH = os.getenv(
+    "DRUG_DB_PATH",
+    os.getenv("INVENTORY_PATH", os.path.join("app", "data", "drugs.csv"))
+)
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
+def _refresh_drug_database() -> bool:
+    """Fetch dữ liệu mới từ FDA API và lưu vào local database."""
+    try:
+        logger.info("📥 Không tìm thấy dữ liệu local. Đang gọi FDA API để lấy dữ liệu...")
+        drugs = fetch_drug_data()
+        if not drugs:
+            logger.warning("⚠️ Không lấy được dữ liệu từ FDA API")
+            return False
+        return save_to_csv(drugs, output_file=DRUG_DB_PATH)
+    except Exception as e:
+        logger.error(f"❌ Lỗi khi refresh database: {str(e)}")
+        return False
+
+
 def load_inventory() -> pd.DataFrame:
     """
-    Load file inventory.csv vào DataFrame
+    Load local drug database vào DataFrame.
 
     Returns:
-        pd.DataFrame: DataFrame với các cột Ten_Thuoc, Hoat_Chat, Ton_Kho
+        pd.DataFrame: DataFrame với các cột từ database (brand_name, generic_name, stock_quantity, ...)
     """
     try:
-        df = pd.read_csv(INVENTORY_PATH)
-        logger.info(f"✅ Load inventory thành công: {len(df)} dòng")
+        if not os.path.exists(DRUG_DB_PATH):
+            _refresh_drug_database()
+
+        df = pd.read_csv(DRUG_DB_PATH)
+        if df.empty:
+            logger.warning("⚠️ Database trống. Thử lấy dữ liệu từ FDA API...")
+            if _refresh_drug_database():
+                df = pd.read_csv(DRUG_DB_PATH)
+
+        logger.info(f"✅ Load drug database thành công: {len(df)} dòng")
         return df
     except FileNotFoundError:
-        logger.error(f"❌ Không tìm thấy file: {INVENTORY_PATH}")
+        logger.error(f"❌ Không tìm thấy file: {DRUG_DB_PATH}")
         return pd.DataFrame()
     except Exception as e:
-        logger.error(f"❌ Lỗi load inventory: {str(e)}")
+        logger.error(f"❌ Lỗi load database: {str(e)}")
         return pd.DataFrame()
+
+
+def _normalize_text(value: Any) -> str:
+    return str(value).lower().strip() if value is not None else ""
+
+
+def _map_database_row(row: Dict[str, Any]) -> Dict[str, Any]:
+    return {
+        "Ten_Thuoc": row.get("brand_name") or row.get("generic_name") or "Unknown",
+        "Hoat_Chat": row.get("generic_name") or "Unknown",
+        "Ton_Kho": row.get("stock_quantity", 0),
+        "Manufacturer": row.get("manufacturer_name", ""),
+        "Product_NDC": row.get("product_ndc", ""),
+        "Route": row.get("route", ""),
+    }
 
 
 def find_alternative_drugs(active_ingredient: str) -> List[Dict]:
     """
-    Tìm các thuốc thay thế có cùng hoạt chất và còn tồn kho > 0
+    Tìm các thuốc thay thế có cùng hoạt chất và còn tồn kho > 0.
+    Ưu tiên so sánh FDA với local database (drugs.csv).
 
     Args:
         active_ingredient (str): Hoạt chất chính (vd: "ibuprofen")
 
     Returns:
-        List[Dict]: Danh sách thuốc thay thế
+        List[Dict]: Danh sách thuốc thay thế theo schema UI
     """
     try:
         df = load_inventory()
 
         if df.empty:
-            logger.warning("⚠️ Inventory trống!")
+            logger.warning("⚠️ Database trống!")
             return []
 
-        active_ingredient_text = str(active_ingredient).lower().strip()
+        active_ingredient_text = _normalize_text(active_ingredient)
 
-        # Tìm thuốc có cùng hoạt chất và còn tồn kho > 0.
-        # Ưu tiên match chính xác, sau đó fallback match theo "chuỗi chứa hoạt chất"
-        exact_match_df = df[
-            (df["Hoat_Chat"].str.lower() == active_ingredient_text) &
-            (df["Ton_Kho"] > 0)
+        # Hỗ trợ cả schema cũ (inventory.csv) và schema database (drugs.csv)
+        if {"Hoat_Chat", "Ton_Kho"}.issubset(df.columns):
+            exact_match_df = df[
+                (df["Hoat_Chat"].str.lower() == active_ingredient_text) &
+                (df["Ton_Kho"] > 0)
             ]
-
-        if not exact_match_df.empty:
-            alternative_drugs = exact_match_df.to_dict("records")
-        else:
-            contains_match_df = df[
-                (df["Ton_Kho"] > 0) &
-                (df["Hoat_Chat"].str.lower().apply(lambda ing: str(ing) in active_ingredient_text))
+            if not exact_match_df.empty:
+                alternative_drugs = exact_match_df.to_dict("records")
+            else:
+                contains_match_df = df[
+                    (df["Ton_Kho"] > 0) &
+                    (df["Hoat_Chat"].str.lower().apply(lambda ing: str(ing) in active_ingredient_text))
                 ]
-            alternative_drugs = contains_match_df.to_dict("records")
+                alternative_drugs = contains_match_df.to_dict("records")
+            logger.info(f"🔎 Tìm thấy {len(alternative_drugs)} thuốc thay thế (inventory schema)")
+            return alternative_drugs
 
-        logger.info(f"🔎 Tìm thấy {len(alternative_drugs)} thuốc thay thế")
+        if {"generic_name", "stock_quantity"}.issubset(df.columns):
+            exact_match_df = df[
+                (df["generic_name"].str.lower() == active_ingredient_text) &
+                (df["stock_quantity"] > 0)
+            ]
+            if not exact_match_df.empty:
+                matches = exact_match_df
+            else:
+                matches = df[
+                    (df["stock_quantity"] > 0) &
+                    (df["generic_name"].str.lower().apply(lambda ing: str(ing) in active_ingredient_text))
+                ]
 
-        return alternative_drugs
+            alternative_drugs = [
+                _map_database_row(row)
+                for row in matches.to_dict("records")
+            ]
+            logger.info(f"🔎 Tìm thấy {len(alternative_drugs)} thuốc thay thế (database schema)")
+            return alternative_drugs
+
+        logger.warning("⚠️ Schema database không hợp lệ")
+        return []
 
     except Exception as e:
         logger.error(f"❌ Lỗi tìm kiếm thuốc thay thế: {str(e)}")

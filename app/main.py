@@ -295,13 +295,13 @@ def main():
         2. 🔍 Nhập tên thuốc bị hết hàng
         3. ⏳ Hệ thống sẽ:
            - Tra cứu OpenFDA Database
-           - Tìm thuốc thay thế trong kho
+           - Tìm thuốc thay thế trong database
            - Gợi ý bằng Google Gemini AI
         4. 📋 Duyệt hoặc từ chối tư vấn
         
         ### 🔗 Nguồn Dữ Liệu
         - **FDA API**: OpenFDA Drug Labels
-        - **Kho**: inventory.csv (Mock Data)
+        - **Database**: app/data/drugs.csv (Local DB; tu dong refresh khi can)
         - **LLM**: Google Gemini 2.5 Flash
         
         ### ⚙️ Công Nghệ

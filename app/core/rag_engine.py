@@ -11,7 +11,7 @@ import google.generativeai as genai
 import pandas as pd
 from dotenv import load_dotenv
 
-from app.tools.fda import get_full_fda_info
+from app.tools.fda import get_full_fda_info, find_alternative_drugs
 
 # Cấu hình logging
 logging.basicConfig(level=logging.INFO)
