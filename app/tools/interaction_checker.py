@@ -1,4 +1,5 @@
 import requests
+from langchain.tools import tool
 
 def get_rxcui(drug_name):
     """Lấy mã rxcui từ tên thuốc thông qua RxNav API"""
@@ -9,7 +10,7 @@ def get_rxcui(drug_name):
     except:
         return None
 
-
+@tool
 def check_interaction_rxnav(drug_list):
     """Kiểm tra tương tác của một danh sách thuốc"""
     # 1. Chuyển đổi tên thuốc sang mã rxcui

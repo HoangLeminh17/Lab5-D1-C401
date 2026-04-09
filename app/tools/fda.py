@@ -6,6 +6,8 @@ Tra cứu: Hoạt chất, Đường dùng, Chỉ định, Chống chỉ định,
 import requests
 import logging
 from typing import Dict, Optional
+from langchain.tools import tool
+
 
 # Cấu hình logging
 logging.basicConfig(level=logging.INFO)
@@ -16,6 +18,69 @@ FDA_API_BASE_URL = "https://api.fda.gov/drug/label.json"
 API_TIMEOUT = 10  # seconds
 
 
+def load_inventory() -> pd.DataFrame:
+    """
+    Load file inventory.csv vào DataFrame
+
+    Returns:
+        pd.DataFrame: DataFrame với các cột Ten_Thuoc, Hoat_Chat, Ton_Kho
+    """
+    try:
+        df = pd.read_csv(INVENTORY_PATH)
+        logger.info(f"✅ Load inventory thành công: {len(df)} dòng")
+        return df
+    except FileNotFoundError:
+        logger.error(f"❌ Không tìm thấy file: {INVENTORY_PATH}")
+        return pd.DataFrame()
+    except Exception as e:
+        logger.error(f"❌ Lỗi load inventory: {str(e)}")
+        return pd.DataFrame()
+
+
+def find_alternative_drugs(active_ingredient: str) -> List[Dict]:
+    """
+    Tìm các thuốc thay thế có cùng hoạt chất và còn tồn kho > 0
+
+    Args:
+        active_ingredient (str): Hoạt chất chính (vd: "ibuprofen")
+
+    Returns:
+        List[Dict]: Danh sách thuốc thay thế
+    """
+    try:
+        df = load_inventory()
+
+        if df.empty:
+            logger.warning("⚠️ Inventory trống!")
+            return []
+
+        active_ingredient_text = str(active_ingredient).lower().strip()
+
+        # Tìm thuốc có cùng hoạt chất và còn tồn kho > 0.
+        # Ưu tiên match chính xác, sau đó fallback match theo "chuỗi chứa hoạt chất"
+        exact_match_df = df[
+            (df["Hoat_Chat"].str.lower() == active_ingredient_text) &
+            (df["Ton_Kho"] > 0)
+            ]
+
+        if not exact_match_df.empty:
+            alternative_drugs = exact_match_df.to_dict("records")
+        else:
+            contains_match_df = df[
+                (df["Ton_Kho"] > 0) &
+                (df["Hoat_Chat"].str.lower().apply(lambda ing: str(ing) in active_ingredient_text))
+                ]
+            alternative_drugs = contains_match_df.to_dict("records")
+
+        logger.info(f"🔎 Tìm thấy {len(alternative_drugs)} thuốc thay thế")
+
+        return alternative_drugs
+
+    except Exception as e:
+        logger.error(f"❌ Lỗi tìm kiếm thuốc thay thế: {str(e)}")
+        return []
+
+@tool
 def get_full_fda_info(brand_name: str) -> Dict[str, Optional[str]]:
     """
     Tra cứu thông tin CHI TIẾT của thuốc từ OpenFDA API.
@@ -149,7 +214,6 @@ def get_full_fda_info(brand_name: str) -> Dict[str, Optional[str]]:
     except Exception as e:
         logger.error(f"❌ Lỗi không xác định: {str(e)}")
         return result
-
 
 if __name__ == "__main__":
     # Test
