@@ -5,6 +5,8 @@ Tra cứu: Hoạt chất, Đường dùng, Chỉ định, Chống chỉ định,
 import os
 import requests
 import logging
+import re
+import time
 from pathlib import Path
 from typing import Dict, Optional, List, Any
 from langchain.tools import tool
@@ -115,6 +117,82 @@ def find_alternative_drugs(active_ingredient: str) -> List[Dict]:
         logger.error(f"❌ Lỗi tìm kiếm thuốc thay thế: {str(e)}")
         return []
 
+
+def _normalize_drug_name_text(drug_name: str) -> str:
+    """Chuẩn hóa tên thuốc để tăng tỉ lệ match OpenFDA (bỏ liều, chuẩn hóa khoảng trắng)."""
+    cleaned = re.sub(r"\b\d+(?:\.\d+)?\s*(mg|g|mcg|ml)\b", "", drug_name, flags=re.IGNORECASE)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+    return cleaned or drug_name
+
+
+def _short_text(value: Any, max_len: int = 90) -> str:
+    text = str(value) if value is not None else ""
+    if len(text) <= max_len:
+        return text
+    return text[:max_len].rstrip() + "..."
+
+
+def _build_fda_search_terms(user_input: str) -> List[str]:
+    """Sinh danh sách term fallback để xử lý typo kiểu 'Pannadol'."""
+    terms: List[str] = []
+
+    def _add_term(term: Optional[str]):
+        if not term:
+            return
+        t = term.strip()
+        if not t:
+            return
+        if t.lower() not in {x.lower() for x in terms}:
+            terms.append(t)
+
+    _add_term(user_input)
+    _add_term(_normalize_drug_name_text(user_input))
+
+    # Tận dụng bộ chuẩn hóa đang có trong interaction checker (RxNorm approximate term)
+    try:
+        from app.tools.interaction_checker import get_us_standard_name
+        standardized = get_us_standard_name(user_input)
+        _add_term(standardized)
+        _add_term(_normalize_drug_name_text(standardized))
+    except Exception as e:
+        logger.warning("[FDA][NORMALIZE_WARN] input='%s' | detail=%s", user_input, str(e))
+
+    return terms
+
+
+def _query_openfda_first_result(search_query: str) -> Optional[Dict[str, Any]]:
+    """Trả về record đầu tiên nếu query có kết quả; None nếu không có dữ liệu."""
+    params = {
+        "search": search_query,
+        "limit": 1,
+    }
+
+    start_time = time.perf_counter()
+    response = requests.get(FDA_API_BASE_URL, params=params, timeout=API_TIMEOUT)
+    elapsed_ms = (time.perf_counter() - start_time) * 1000
+
+    logger.info(
+        "[FDA][HTTP] status=%s | elapsed=%.1fms | url=%s",
+        response.status_code,
+        elapsed_ms,
+        response.url,
+    )
+
+    # OpenFDA thường trả 404 khi không có kết quả
+    if response.status_code == 404:
+        logger.info("[FDA][MISS] query=%s", search_query)
+        return None
+
+    response.raise_for_status()
+    data = response.json()
+    results = data.get("results", []) if isinstance(data, dict) else []
+    logger.info("[FDA][PARSE] total_results=%s | query=%s", len(results), search_query)
+
+    if not results:
+        return None
+
+    return results[0]
+
 @tool
 def get_full_fda_info(brand_name: str):
     """
@@ -145,31 +223,40 @@ def get_full_fda_info(brand_name: str):
     }
     
     try:
-        # Chuẩn bị query
-        search_query = f'openfda.brand_name:"{brand_name}"'
-        params = {
-            "search": search_query,
-            "limit": 1
-        }
-        
-        logger.info(f"🔍 Tra cứu FDA: {brand_name}")
-        
-        # Gọi API
-        response = requests.get(
-            FDA_API_BASE_URL,
-            params=params,
-            timeout=API_TIMEOUT
+        search_terms = _build_fda_search_terms(brand_name)
+        search_fields = [
+            "openfda.brand_name",
+            "openfda.generic_name",
+            "openfda.substance_name",
+        ]
+
+        logger.info(
+            "[FDA][START] input='%s' | terms=%s | fields=%s | timeout=%ss",
+            brand_name,
+            search_terms,
+            search_fields,
+            API_TIMEOUT,
         )
-        response.raise_for_status()
-        
-        data = response.json()
-        
-        # Kiểm tra kết quả
-        if not data.get("results") or len(data["results"]) == 0:
-            logger.warning(f"⚠️ Không tìm thấy: {brand_name} trên FDA")
+
+        drug = None
+        matched_query = None
+        for term in search_terms:
+            for field in search_fields:
+                search_query = f'{field}:"{term}"'
+                logger.info("[FDA][TRY] field=%s | term='%s'", field, term)
+                candidate = _query_openfda_first_result(search_query)
+                if candidate is not None:
+                    drug = candidate
+                    matched_query = search_query
+                    break
+            if drug is not None:
+                break
+
+        if drug is None:
+            logger.warning("[FDA][NOT_FOUND] input='%s' | attempted_terms=%s", brand_name, search_terms)
             return result
-        
-        drug = data["results"][0]
+
+        logger.info("[FDA][MATCH] input='%s' | query=%s", brand_name, matched_query)
         
         # 1. Hoạt chất (Active Ingredient)
         # OpenFDA có thể trả về list[str], str, hoặc list[dict] tùy record.
@@ -230,24 +317,39 @@ def get_full_fda_info(brand_name: str):
                 result[key] = "Not available in FDA database"
         
         result["success"] = True
-        logger.info(f"✅ Tìm thấy: {result['Hoat_Chat']}")
+        logger.info(
+            "[FDA][SUCCESS] input='%s' | hoat_chat='%s' | duong_dung='%s' | chi_dinh='%s' | chong_chi_dinh='%s' | tac_dung_phu='%s'",
+            brand_name,
+            _short_text(result.get("Hoat_Chat")),
+            _short_text(result.get("Duong_Dung")),
+            _short_text(result.get("Chi_Dinh")),
+            _short_text(result.get("Chong_Chi_Dinh")),
+            _short_text(result.get("Tac_Dung_Phu")),
+        )
         
         return result
     
     except requests.exceptions.Timeout:
-        logger.error(f"❌ Timeout FDA API (>{API_TIMEOUT}s)")
+        logger.error("[FDA][TIMEOUT] input='%s' | timeout=%ss", brand_name, API_TIMEOUT)
         return result
     except requests.exceptions.ConnectionError:
-        logger.error(f"❌ Lỗi kết nối mạng")
+        logger.error("[FDA][CONNECTION_ERROR] input='%s'", brand_name)
         return result
     except requests.exceptions.HTTPError as e:
-        logger.error(f"❌ Lỗi HTTP: {str(e)}")
+        response = getattr(e, "response", None)
+        logger.error(
+            "[FDA][HTTP_ERROR] input='%s' | status=%s | url=%s | detail=%s",
+            brand_name,
+            getattr(response, "status_code", "unknown"),
+            getattr(response, "url", "unknown"),
+            str(e),
+        )
         return result
     except ValueError:
-        logger.error(f"❌ Lỗi parse JSON")
+        logger.error("[FDA][JSON_ERROR] input='%s'", brand_name)
         return result
     except Exception as e:
-        logger.error(f"❌ Lỗi không xác định: {str(e)}")
+        logger.error("[FDA][UNEXPECTED_ERROR] input='%s' | detail=%s", brand_name, str(e))
         return result
 
 if __name__ == "__main__":
