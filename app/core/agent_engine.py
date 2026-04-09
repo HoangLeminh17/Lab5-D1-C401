@@ -1,3 +1,12 @@
+import sys
+from pathlib import Path
+
+# Hỗ trợ chạy trực tiếp: python app/core/agent_engine.py
+if __package__ is None or __package__ == "":
+    project_root = Path(__file__).resolve().parents[2]
+    if str(project_root) not in sys.path:
+        sys.path.insert(0, str(project_root))
+
 from langchain_google_genai import ChatGoogleGenerativeAI
 from app.tools.fda import get_full_fda_info
 from app.tools.interaction_checker import check_interaction_rxnav
