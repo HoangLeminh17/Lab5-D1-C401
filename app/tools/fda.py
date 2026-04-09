@@ -150,8 +150,18 @@ def _build_fda_search_terms(user_input: str) -> List[str]:
 
     # Tận dụng bộ chuẩn hóa đang có trong interaction checker (RxNorm approximate term)
     try:
-        from app.tools.interaction_checker import get_us_standard_name
-        standardized = get_us_standard_name(user_input)
+        standardizer = None
+        try:
+            from app.tools.interaction_checker import get_us_standard_name as _std_from_interaction
+            standardizer = _std_from_interaction
+        except Exception:
+            from app.tools.check_name_drug import get_us_standard_name as _std_from_name_tool
+            standardizer = _std_from_name_tool
+
+        if hasattr(standardizer, "invoke"):
+            standardized = standardizer.invoke({"drug_name": user_input})
+        else:
+            standardized = standardizer(user_input)
         _add_term(standardized)
         _add_term(_normalize_drug_name_text(standardized))
     except Exception as e:
