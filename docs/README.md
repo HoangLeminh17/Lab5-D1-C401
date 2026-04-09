@@ -1,270 +1,264 @@
-# 💊 Pharmacist Assistant - RAG Chatbot powered by Google Gemini
+# 💊 Pharmacist Assistant
 
-Một hệ thống chatbot thông minh giúp dược sĩ gợi ý thuốc thay thế khi dụng cụ bị hết hàng, sử dụng Google Gemini 2.5 Flash API.
+<p>
+  <b>AI-powered decision support for pharmacists</b><br/>
+  Find safe alternatives, normalize misspelled drug names, and check potential interaction risks.
+</p>
 
-## 🎯 Tính Năng
+<p>
+  <img alt="Python" src="https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white" />
+  <img alt="Streamlit" src="https://img.shields.io/badge/Streamlit-UI-FF4B4B?logo=streamlit&logoColor=white" />
+  <img alt="LangChain" src="https://img.shields.io/badge/LangChain-Agent-1B5E20" />
+  <img alt="Gemini" src="https://img.shields.io/badge/Gemini-2.5%20Flash-1A73E8" />
+  <img alt="OpenFDA" src="https://img.shields.io/badge/OpenFDA-Label%20API-0B7285" />
+  <img alt="RxNorm" src="https://img.shields.io/badge/RxNorm-Approximate%20Term-6A1B9A" />
+</p>
 
-- **Tra cứu OpenFDA API**: Lấy hoạt chất, đường dùng, chỉ định, chống chỉ định, tác dụng phụ
-- **Tìm kiếm kho**: Query CSV để tìm thuốc thay thế có sẵn
-- **Tư vấn thông minh**: Sử dụng Google Gemini 2.5 Flash để sinh tư vấn lâm sàng chuyên sâu
-- **Dịch Tiếng Việt**: Tự động dịch các cảnh báo quan trọng sang tiếng Việt
-- **Giao diện Streamlit**: Dễ sử dụng, hiệu ứng visuạl
-- **Feedback System**: Duyệt/Từ chối tư vấn để cải thiện hệ thống
+---
 
-## 📋 Yêu Cầu Hệ Thống
+## ✨ Highlights
 
-- Python 3.8+
+- 🔎 Query OpenFDA for core clinical fields
+- 🧠 Normalize drug names via RxNorm (handles approximate spelling)
+- 🏥 Match alternatives against internal inventory (CSV)
+- ⚠️ Check pairwise interaction warnings from OpenFDA labels
+- 💬 Generate concise Vietnamese recommendation text using Gemini
+- ✅ Record pharmacist feedback (approve/reject) in UI session history
+
+> <span style="color:#b45309;"><b>Clinical safety note:</b></span> This system supports decisions. It does not replace licensed pharmacist or physician judgment.
+
+---
+
+## 🧭 What The System Does
+
+For an out-of-stock medicine request, the pipeline can:
+
+1. Normalize the input drug name (brand/generic/typo handling)
+2. Pull FDA label information:
+   - active ingredient
+   - route
+   - indications
+   - contraindications
+   - adverse reactions
+3. Find in-stock alternatives from internal inventory data
+4. Produce concise clinical recommendation text for pharmacy staff
+5. Optionally check interaction alerts for multi-drug combinations
+
+---
+
+## 🚨 Current Repository Gap
+
+<div style="border-left: 4px solid #dc2626; padding: 10px 14px; background: #fff5f5;">
+  <b style="color:#b91c1c;">Important:</b>
+  <span style="color:#7f1d1d;"> app/main.py imports app/core/rag_engine.py, but this file is currently missing in this repository snapshot.</span>
+</div>
+
+Practical impact:
+- ✅ Tools and agent engine exist and can run
+- ⚠️ Streamlit UI path depends on the missing rag_engine module
+- ⚠️ Some tests/docs still reference older rag_engine locations
+
+---
+
+## 🗂️ Project Structure
+
+```text
+Lab5-D1-C401/
+├── app/
+│   ├── main.py
+│   ├── core/
+│   │   ├── config.py
+│   │   └── agent_engine.py
+│   ├── tools/
+│   │   ├── check_name_drug.py
+│   │   ├── fda.py
+│   │   └── interaction_checker.py
+│   └── data/
+│       └── inventory.csv
+├── docs/
+│   └── README.md
+├── tests/
+│   ├── test_modules.py
+│   ├── test_modules_for_dev.py
+│   └── test.py
+└── requirements.txt
+```
+
+---
+
+## 🧩 Core Modules
+
+### app/tools/check_name_drug.py
+
+<div style="border-left: 4px solid #2563eb; padding: 8px 12px; background: #eff6ff;">
+  <b style="color:#1d4ed8;">Role:</b> Normalize user drug input to US-standard naming via RxNorm APIs.
+</div>
+
+- Main function: get_us_standard_name
+- Uses approximateTerm + properties endpoints
+- Returns lowercase standardized name when possible
+
+### app/tools/fda.py
+
+<div style="border-left: 4px solid #0f766e; padding: 8px 12px; background: #f0fdfa;">
+  <b style="color:#0f766e;">Role:</b> Fetch FDA label data and map alternatives from inventory.
+</div>
+
+- Main function: get_full_fda_info
+- Helper functions:
+  - resolve_inventory_path
+  - load_inventory
+  - find_alternative_drugs
+- Returned fields:
+  - Hoat_Chat
+  - Duong_Dung
+  - Chi_Dinh
+  - Chong_Chi_Dinh
+  - Tac_Dung_Phu
+
+### app/tools/interaction_checker.py
+
+<div style="border-left: 4px solid #9333ea; padding: 8px 12px; background: #faf5ff;">
+  <b style="color:#7e22ce;">Role:</b> Run pairwise interaction lookup using OpenFDA label interaction text.
+</div>
+
+- Main function: check_interaction_openfda
+- Builds combinations from input list
+- Checks both directions A→B and B→A
+
+### app/core/config.py
+
+<div style="border-left: 4px solid #c2410c; padding: 8px 12px; background: #fff7ed;">
+  <b style="color:#9a3412;">Role:</b> Prompt templates, safety settings, and environment-driven config.
+</div>
+
+- CLINICAL_SYSTEM_PROMPT
+- CLINICAL_CONCISE_RESPONSE_RULES
+- DRUG_EXPLANATION_RULES
+- GEMINI_SAFETY_SETTINGS
+- get_core_config
+
+### app/core/agent_engine.py
+
+<div style="border-left: 4px solid #15803d; padding: 8px 12px; background: #f0fdf4;">
+  <b style="color:#166534;">Role:</b> LangChain tool-calling agent powered by Gemini.
+</div>
+
+- Creates a tool-enabled clinical assistant
+- Registered tools:
+  - get_full_fda_info
+  - check_interaction_openfda
+  - get_us_standard_name
+- Main entry: run_clinical_agent
+
+### app/main.py
+
+<div style="border-left: 4px solid #be123c; padding: 8px 12px; background: #fff1f2;">
+  <b style="color:#9f1239;">Role:</b> Streamlit interface for pharmacists (search, recommendation, explanation, feedback).
+</div>
+
+- UI features:
+  - Search input for out-of-stock medicine
+  - FDA details panel
+  - Alternatives panel
+  - Recommendation panel
+  - Explain-this-drug button
+  - Approve/Reject feedback buttons
+
+---
+
+## ⚙️ Requirements
+
+- Python 3.10+
 - pip
-- Internet connection (để gọi FDA API và Google Gemini API)
+- Internet access for Gemini, OpenFDA, RxNorm
 
-## 🚀 Cài Đặt
-
-### 1. Clone/Download Project
-
-```bash
-cd Drug
-```
-
-### 2. Tạo Virtual Environment (Optional nhưng được khuyến nghị)
-
-```bash
-python -m venv venv
-
-# Windows
-venv\Scripts\activate
-
-# MacOS/Linux
-source venv/bin/activate
-```
-
-### 3. Cài Đặt Dependencies
+Install dependencies:
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 4. Cấu Hình API Keys
+---
 
-Edit file `.env` với thông tin API của bạn:
+## 🔐 Environment Variables
+
+Create .env (or copy from .env.example):
 
 ```env
-# Lấy API key từ: https://makersuite.google.com/app/apikey
-GEMINI_API_KEY=AIzaSyD...
+GEMINI_API_KEY=your_api_key
 GEMINI_MODEL=gemini-2.5-flash
+INVENTORY_PATH=app/data/inventory.csv
 ```
 
-**Lưu ý**: 
-- Truy cập vào https://makersuite.google.com/app/apikey để tạo và lấy API key
-- FDA API không cần API key (public)
-- Không commit file `.env` (đã thêm vào `.gitignore`)
+> <span style="color:#065f46;"><b>Cost note:</b></span> OpenFDA and RxNorm are free/public. Main variable cost is Gemini inference.
 
-## 📂 Cấu Trúc Dự Án
+---
 
-```
-Drug/
-├── fda_api.py           # Module FDA API Integration
-├── rag_engine.py        # Module RAG Engine
-├── app.py               # Giao diện Streamlit
-├── inventory.csv        # Mock Data (Kho thuốc)
-├── requirements.txt     # Python Dependencies
-├── .env                 # Environment Configuration
-└── README.md            # Tài liệu này
-```
+## ▶️ Run
 
-## 🛠️ Cách Sử Dụng
-
-### Chạy ứng dụng Streamlit:
+### Option A: Agent CLI (works now)
 
 ```bash
-python -m streamlit run main.py
+python app/core/agent_engine.py
 ```
 
-Ứng dụng sẽ mở tại: `http://localhost:8501`
+Example prompt:
+- Suggest alternatives for Advil and check interactions with aspirin.
 
-### Luồng Nghiệp Vụ:
-
-1. **Cấu hình `.env` & nhập tên thuốc**: Khai báo `GEMINI_API_KEY` trong file `.env`, sau đó nhập tên thuốc bị hết hàng (vd: "Advil")
-2. **FDA API**: Hệ thống gọi API để lấy hoạt chất, chỉ định, chống chỉ định, tác dụng phụ
-3. **Tìm Kho**: Tìm các thuốc có cùng hoạt chất và `Ton_Kho > 0`
-4. **Tư Vấn Gemini**: Gọi Google Gemini 2.5 Flash với system instruction dạng Dược sĩ lâm sàng. Dịch cảnh báo sang Tiếng Việt
-5. **Feedback**: Dược sĩ chọn [✅ Duyệt Bán] hoặc [❌ Từ Chối]
-
-## 📚 Chi Tiết Các Module
-
-### 1. `fda_api.py` - Tra cứu OpenFDA
-
-```python
-from fda_api import get_full_fda_info
-
-# Lấy thông tin chi tiết
-fda_info = get_full_fda_info("Advil")
-
-# Kết quả:
-# {
-#     "Hoat_Chat": "ibuprofen",
-#     "Duong_Dung": "Oral",
-#     "Chi_Dinh": "For temporary relief of...",
-#     "Chong_Chi_Dinh": "Do not use if...",
-#     "Tac_Dung_Phu": "May cause...",
-#     "success": True
-# }
-```
-
-**Tính năng:**
-- ✅ Lấy 5 thông tin chi tiết (Hoạt chất, Đường dùng, Chỉ định, Chống chỉ định, Tác dụng phụ)
-- ✅ Xử lý timeout API (10s)
-- ✅ Try/except toàn diện
-- ✅ Logging chi tiết
-
-### 2. `rag_engine.py` - RAG Engine với Google Gemini
-
-```python
-from rag_engine import get_clinical_recommendation
-
-# Lấy tư vấn hoàn chỉnh (tự đọc GEMINI_API_KEY từ .env)
-result = get_clinical_recommendation("Advil")
-
-# Kết quả:
-# {
-#     "brand_name": "Advil",
-#     "fda_info": {...},
-#     "alternative_drugs": [...],
-#     "recommendation": "...",
-#     "success": True,
-#     "error_message": ""
-# }
-```
-
-**Luồng 5 bước:**
-1. Cấu hình Google Gemini API
-2. Gọi `get_full_fda_info()` để lấy thông tin FDA
-3. Tìm thuốc thay thế từ `inventory.csv`
-4. Tạo prompt với system instruction dạng Dược sĩ lâm sàng
-5. Gọi Gemini API với dịch sang Tiếng Việt
-
-**Đặc điểm:**
-- 🎯 Sử dụng `gemini-2.5-flash` (nhanh chóng và chính xác)
-- 🇻🇳 Tự động dịch cảnh báo quan trọng sang Tiếng Việt
-- 📋 Format Markdown cho dễ đọc
-- ⚠️ Ưu tiên an toàn bệnh nhân
-
-### 3. `main.py` - Streamlit UI
-
-**Các thành phần:**
-- 🔐 Đọc Google Gemini API Key từ file `.env`
-- 🔍 Form tìm kiếm thuốc
-- 📊 Hiển thị thông tin FDA chi tiết (Hoạt chất, Đường dùng, Chỉ định, Chống chỉ định, Tác dụng phụ)
-- 💊 Danh sách thuốc thay thế có sẵn trong kho
-- 📋 Tư vấn lâm sàng từ Google Gemini (với Tiếng Việt)
-- ✅ Nút [✅ Duyệt Bán] / ❌ [Từ Chối]
-- 📜 Lịch sử tư vấn
-
-## 🔧 Cấu Hình Nâng Cao
-
-### Tạo API Key từ Google Cloud Console
-
-Nếu bạn muốn quản lý quyền hạn cao hơn:
-
-1. Truy cập: https://console.cloud.google.com
-2. Tạo project mới
-3. Bật API: Google Generative AI API
-4. Tạo Service Account key
-5. Sử dụng trong code
-
-### Test Module Riêng Lẻ
+### Option B: Streamlit UI (requires rag_engine)
 
 ```bash
-# Test fda_api.py
-python fda_api.py
-
-# Test rag_engine.py (đọc API key từ .env)
-python rag_engine.py
+streamlit run app/main.py
 ```
 
-## 📝 Inventory CSV Format
+This path needs app/core/rag_engine.py to be restored/implemented.
+
+---
+
+## 🧪 Test Scripts
+
+```bash
+python tests/test_modules.py
+python tests/test_modules_for_dev.py
+python tests/test.py
+```
+
+Some tests still include legacy import references. Update paths if needed before running in this snapshot.
+
+---
+
+## 🗃️ Inventory Format
 
 ```csv
 Ten_Thuoc,Hoat_Chat,Ton_Kho
-Advil,ibuprofen,0
-Ibuprofen 200mg,ibuprofen,120
-Paracetamol,paracetamol,0
-Tylenol,paracetamol,200
-...
 ```
 
-**Lưu ý:**
-- Header phải là: `Ten_Thuoc, Hoat_Chat, Ton_Kho`
-- `Ton_Kho > 0` = Drug có sẵn
-- `Ton_Kho = 0` = Drug hết hàng (sẽ bỏ qua)
+- Ten_Thuoc: display/commercial name
+- Hoat_Chat: active ingredient
+- Ton_Kho: stock amount (0 = out of stock)
 
-## 🐛 Troubleshooting
+---
 
-### "Timeout khi gọi FDA API"
+## 🛡️ Safety & Limitations
 
-```
-FDA API chậm hoặc không kết nối. Kiểm tra:
-- Kết nối internet
-- FDA API status: https://api.fda.gov
-- Thử lại sau vài giây
-```
+- OpenFDA data can be incomplete/inconsistent
+- No match does not mean no risk
+- Interaction search is label-text based, not a complete interaction DB
+- Clinical outputs must be verified by licensed professionals
 
-### "Google Gemini API Error: Invalid API key"
+---
 
-```
-Kiểm tra:
-1. API key lấy từ https://makersuite.google.com/app/apikey?
-2. API key không bị revoke?
-3. API key còn hạn sử dụng?
-4. Tài khoản Google đã kích hoạt API?
-```
+## 🚀 Suggested Next Steps
 
-### "File not found: inventory.csv"
+- Rebuild app/core/rag_engine.py for full UI pipeline
+- Add confidence signaling for uncertain mapping results
+- Add curated high-risk interaction regression set
+- Add structured evaluation and analytics dashboard
+- Move inventory from CSV to database-backed storage
 
-```
-Đảm bảo:
-1. inventory.csv nằm cùng thư mục với app.py
-2. Hoặc set INVENTORY_PATH trong .env
-```
-
-### "Gemini API returns safety error"
-
-```
-Điều này có thể xảy ra nếu prompt bị xem là không an toàn.
-Giải pháp: Hệ thống đã setup safety_settings=BLOCK_NONE.
-Nếu vẫn lỗi, thử test với prompt khác hoặc kiểm tra quota API.
-```
-
-### "Module 'google.generativeai' not found"
-
-```
-Cần cài đặt:
-pip install google-generativeai
-```
-
-## 🔐 Security Notes
-
-- ⚠️ **Không commit file `.env` có API key** - thêm vào `.gitignore`
-- ⚠️ Google Gemini API key là sensitive - không share công khai
-- ⚠️ FDA API là public (không cần key)
-- ⚠️ Sử dụng HTTPS khi triển khai trên production
-- ⚠️ Hạn chế rate limit khi gọi gemin API để tránh chi phí cao
-
-## 📈 Cải Thiện Tương Lai
-
-- [ ] Vector DB (Pinecone, Weaviate) thay CSV
-- [ ] Multi-language support
-- [ ] Advanced filtering (giá, nhà sản xuất, ...)
-- [ ] Analytics dashboard
-- [ ] Database integration thay CSV
-
-## 📞 Support
-
-Liên hệ: [Your Contact]
+---
 
 ## 📄 License
 
 MIT License
-
----
-
-**Made with ❤️ for Pharmacists** | Powered by OpenFDA + Google Gemini 2.5 Flash
