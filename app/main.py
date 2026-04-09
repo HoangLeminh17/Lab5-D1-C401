@@ -6,7 +6,12 @@ Giao diện cho hệ thống gợi ý thuốc thay thế dùng Google Gemini API
 import streamlit as st
 import logging
 import os
-from app.core.rag_engine import get_clinical_recommendation
+from app.core.rag_engine import (
+    get_clinical_recommendation,
+    get_clinical_recommendation_stream,
+    get_drug_explanation_for_pharmacist,
+    get_drug_explanation_for_pharmacist_stream,
+)
 from datetime import datetime
 from dotenv import load_dotenv
 
@@ -86,6 +91,14 @@ if "feedback_submitted" not in st.session_state:
     st.session_state.feedback_submitted = False
 if "chat_history" not in st.session_state:
     st.session_state.chat_history = []
+if "drug_explanations" not in st.session_state:
+    st.session_state.drug_explanations = {}
+
+
+def stream_text(text: str, chunk_size: int = 80):
+    """Stream text theo từng chunk để hiển thị dần trên UI."""
+    for i in range(0, len(text), chunk_size):
+        yield text[i:i + chunk_size]
 
 
 def display_header():
@@ -203,7 +216,7 @@ def display_recommendation(result):
     
     # Thông tin FDA
     display_fda_info(result["fda_info"])
-    
+
     st.markdown("""
     ---
     ### 💊 Thuốc Thay Thế Có Sẵn Trong Kho
@@ -219,12 +232,50 @@ def display_recommendation(result):
                     st.markdown(f"**Hoạt Chất:** {drug['Hoat_Chat']}")
                 with col3:
                     st.markdown(f"**Tồn Kho:** {drug['Ton_Kho']} hộp")
+
+                explain_key = f"explain::{drug['Ten_Thuoc']}"
+                if st.button("🧠 Không rõ thuốc này? Giải thích thêm", key=f"explain_btn_{i}_{drug['Ten_Thuoc']}"):
+                    status_placeholder = st.empty()
+                    explain_placeholder = st.empty()
+                    live_explain = ""
+                    explain_result = None
+
+                    for event in get_drug_explanation_for_pharmacist_stream(drug["Ten_Thuoc"]):
+                        event_type = event.get("type")
+
+                        if event_type == "status":
+                            status_placeholder.info(f"⏳ {event.get('message', '')}")
+                        elif event_type == "fda_info":
+                            status_placeholder.success("✅ Đã lấy thông tin FDA cho thuốc này")
+                        elif event_type == "explanation_chunk":
+                            live_explain += event.get("chunk", "")
+                            explain_placeholder.markdown(live_explain)
+                        elif event_type == "done":
+                            explain_result = event.get("result")
+                            break
+                        elif event_type == "error":
+                            explain_result = event.get("result")
+                            status_placeholder.error(f"❌ {event.get('message', 'Lỗi không xác định')}")
+                            break
+
+                    if explain_result is None:
+                        explain_result = get_drug_explanation_for_pharmacist(drug["Ten_Thuoc"])
+
+                    st.session_state.drug_explanations[explain_key] = explain_result
+
+                explained = st.session_state.drug_explanations.get(explain_key)
+                if explained:
+                    if explained.get("success"):
+                        st.markdown("**Giải thích nhanh cho dược sĩ:**")
+                        st.markdown(explained.get("explanation", ""))
+                    else:
+                        st.warning(explained.get("error_message", "Không thể giải thích thuốc lúc này."))
     else:
         st.info("ℹ️ Không tìm thấy thuốc thay thế nào có sẵn trong kho")
     
     st.markdown("""
     ---
-    ### 📋 Tư Vấn Lâm Sàng từ Google Gemini
+    ### 📋 Tư Vấn Lâm Sàng Ngắn Gọn từ Google Gemini
     """)
     
     st.markdown(
@@ -326,14 +377,63 @@ def main():
     
     # Xử lý tìm kiếm
     if search_button and brand_name.strip():
-        with st.spinner("⏳ Đang xử lý..."):
-            with st.spinner("📍 Gọi FDA API..."):
-                try:
-                    result = get_clinical_recommendation(brand_name.strip())
-                    st.session_state.recommendation_result = result
-                    st.session_state.feedback_submitted = False
-                except Exception as e:
-                    st.error(f"❌ Lỗi: {str(e)}")
+        st.session_state.drug_explanations = {}
+
+        live_status = st.empty()
+        live_context_placeholder = st.empty()
+        live_recommendation_placeholder = st.empty()
+
+        live_context = ""
+        live_recommendation = ""
+        stream_result = None
+
+        try:
+            for event in get_clinical_recommendation_stream(brand_name.strip()):
+                event_type = event.get("type")
+
+                if event_type == "status":
+                    live_status.info(f"⏳ {event.get('message', '')}")
+
+                elif event_type == "fda_info":
+                    fda_data = event.get("data", {})
+                    live_status.success(
+                        f"✅ FDA: {fda_data.get('Hoat_Chat', 'N/A')} | {fda_data.get('Duong_Dung', 'N/A')}"
+                    )
+
+                elif event_type == "alternatives":
+                    alternatives = event.get("data", [])
+                    live_status.info(f"💊 Tìm thấy {len(alternatives)} thuốc thay thế trong kho")
+
+                elif event_type == "context_chunk":
+                    live_context += event.get("chunk", "")
+                    live_context_placeholder.markdown(
+                        "### 🧠 Context Phân Tích (Stream)\n\n" + live_context
+                    )
+
+                elif event_type == "recommendation_chunk":
+                    live_recommendation += event.get("chunk", "")
+                    live_recommendation_placeholder.markdown(
+                        "### 📋 Tư Vấn Lâm Sàng (Streaming)\n\n" + live_recommendation
+                    )
+
+                elif event_type == "done":
+                    stream_result = event.get("result")
+                    live_status.success("✅ Hoàn tất tư vấn")
+                    break
+
+                elif event_type == "error":
+                    stream_result = event.get("result")
+                    live_status.error(f"❌ {event.get('message', 'Lỗi không xác định')}")
+                    break
+
+            if stream_result is None:
+                stream_result = get_clinical_recommendation(brand_name.strip())
+
+            st.session_state.recommendation_result = stream_result
+            st.session_state.feedback_submitted = False
+
+        except Exception as e:
+            st.error(f"❌ Lỗi: {str(e)}")
     
     # Hiển thị kết quả
     if st.session_state.recommendation_result:

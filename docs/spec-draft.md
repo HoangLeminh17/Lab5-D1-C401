@@ -3,10 +3,10 @@
 ## Track: Vinmec
 
 ## Problem statement
-Tại quầy thuốc/bộ phận tư vấn, dược sĩ thường gặp tình huống thuốc khách yêu cầu đã hết hàng.
+Tại quầy thuốc/bộ phận tư vấn, dược sĩ thường gặp tình huống thuốc mà khách yêu cầu đã hết hàng.
 Hiện tại nhân sự phải tra cứu thủ công theo hoạt chất và hướng dẫn sử dụng, mất 3-10 phút mỗi ca,
 dễ bỏ sót chống chỉ định hoặc tác dụng phụ quan trọng. Hệ thống AI có thể tự động tra cứu OpenFDA,
-đối chiếu tồn kho nội bộ, và gợi ý thuốc thay thế có giải thích rõ ràng để rút ngắn thời gian tư vấn.
+đối chiếu tồn kho nội bộ, gợi ý thuốc thay thế có giải thích rõ ràng và kiểm chứng việc kết hợp các loại thuốc trong cùng 1 đơn để rút ngắn thời gian tư vấn.
 
 ## Canvas draft
 
