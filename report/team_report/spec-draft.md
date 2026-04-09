@@ -19,27 +19,32 @@ dễ bỏ sót chống chỉ định hoặc tác dụng phụ quan trọng. Hệ
 **Learning signal:**
 - Dược sĩ bấm Duyệt Bán hay Từ Chối sau mỗi gợi ý.
 - Tên thuốc thay thế được chọn cuối cùng so với top gợi ý.
-- Các case không tìm được thuốc thay thế để cập nhật inventory/prompt.
+- Các case không tìm được thuốc thay thế để cập nhật database/prompt.
 
 ## Hướng đi chính
 - Prototype hiện tại:
 	- Module 1: `fda_api.py` lấy 5 trường FDA (`Hoat_Chat`, `Duong_Dung`, `Chi_Dinh`, `Chong_Chi_Dinh`, `Tac_Dung_Phu`).
-	- Module 2: `rag_engine.py` load `inventory.csv`, tìm thuốc còn hàng cùng hoạt chất, gọi Gemini để sinh tư vấn.
+	- Module 2: `rag_engine.py` load load từ database, tìm thuốc còn hàng cùng hoạt chất, gọi Gemini để sinh tư vấn.
 	- Module 3: `app.py` Streamlit UI để nhập thuốc, xem cảnh báo, duyệt/từ chối, lưu history ngắn hạn.
 - Eval mục tiêu phiên bản đầu:
 	- Top-3 alternative coverage >= 80% trên tập test nội bộ.
 	- Tỷ lệ có cảnh báo chống chỉ định/tác dụng phụ trong output >= 95%.
 	- P95 latency end-to-end < 5 giây/lượt (không tính mạng bất thường).
 - Main failure modes:
-	- FDA trả hoạt chất dạng chuỗi nhiều thành phần làm match inventory kém chính xác.
+	- FDA trả hoạt chất dạng chuỗi nhiều thành phần làm match trong database kém chính xác.
 	- Thuốc generic/brand name mapping chưa đầy đủ.
 	- Prompt LLM trả lời dài, thiếu cấu trúc hoặc không nhấn mạnh cảnh báo nguy cơ cao.
+- Định hướng trong tương lai:
+	- Cải thiện OCR Handwritten: Giải quyết bài toán đơn thuốc viết tay
+	- Cá nhân hóa tư vấn: Dựa trên hồ sơ bệnh án và tiền sử dị ứng.
+	- Feedback Loop: Xây dựng Dashboard để dùng dữ liệu Duyệt/Từ chối của dược sĩ tinh chỉnh AI (RLHF).
+	- Cải thiện UI, tích hợp thêm tool vào cho agent.
 
 ## Phân công (7 thành viên)
 - Đăng Hải: Product owner, chốt scope bài toán, user flow và acceptance criteria.
-- Hưng: Data owner cho `inventory.csv`, chuẩn hóa tên thuốc/hoạt chất và kịch bản hết hàng.
-- Ngọc: Phụ trách `fda_api.py`, xử lý parse dữ liệu OpenFDA và fallback khi field thiếu.
-- Hậu: Phụ trách `rag_engine.py`, logic tìm thuốc thay thế, prompt và orchestration Gemini.
-- Kiên: Phụ trách `app.py`, UX Streamlit, luồng feedback Duyệt/Từ chối và hiển thị cảnh báo.
-- Hoàng: Thiết kế bộ eval, đo top-k accuracy, latency, warning coverage, tổng hợp báo cáo test.
-- Xuân Hải: Phụ trách quản lý `.env`, dependency, chạy regression test và release demo, viết ARCHITECTURE.md và README.md.
+- Hưng: Làm database, chuẩn hóa tên thuốc/hoạt chất.
+- Ngọc: Phụ trách front-end, back-end api
+- Hậu: Phụ trách `rag_engine.py`, chỉnh sửa logic tool.
+- Kiên: Phụ trách tool OCR và check trong số lượng thuốc trong kho với Hải
+- Hoàng: Thiết kế bộ eval + front-end
+- Xuân Hải: phụ trách tool OCR và check số lượng trong kho với Kiên
