@@ -45,16 +45,20 @@ def recommend():
         
         # Let's search inventory for alternative_drugs
         try:
-            inventory = pd.read_csv("inventory.csv")
+            import os
+            inventory_path = os.getenv("INVENTORY_PATH", "app/data/inventory.csv")
+            if not os.path.exists(inventory_path):
+                inventory_path = "../inventory.csv" if os.path.exists("../inventory.csv") else "inventory.csv"
+            inventory = pd.read_csv(inventory_path)
             # Convert values manually for simplicity
             alternative_drugs = []
             active_ing_list = get_active_ingredients(brand_name)
             
             if inventory is not None and not inventory.empty:
                 for idx, row in inventory.iterrows():
-                    ten_thuoc = str(row.get('Tên_Thuốc', '') or row.get('Ten_Thuoc', ''))
-                    hoat_chat = str(row.get('Hoạt_Chất', '') or row.get('Hoat_Chat', ''))
-                    ton_kho = row.get('Tồn_Kho', 0) or row.get('Ton_Kho', 0)
+                    ten_thuoc = str(row.get('brand_name', ''))
+                    hoat_chat = str(row.get('generic_name', ''))
+                    ton_kho = row.get('stock_quantity', 0)
                     
                     if pd.isna(ton_kho):
                         ton_kho = 0
