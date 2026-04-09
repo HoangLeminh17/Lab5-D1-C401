@@ -22,7 +22,7 @@ Dược sĩ nhập tên một loại thuốc, hệ thống sẽ đưa ra một v
 | Đăng Hải | Define scope, design user flow, build logic drug | fda.py, agent_engine.py  |
 | Tuấn Hưng | Backend + Data Engineer | ./app/data |
 | Trung Hậu | Eval metrics + ROI + demo slides | spec/spec-final.md phần 3, 5, demo/slides.pdf |
-| Bảo Ngọc | UI prototype + demo script | prototype/, demo/demo-script.md |
+| Bảo Ngọc | UI prototype + API backend | branch be_fe |
 | Minh Hoàng | UI prototype + demo script | prototype/, demo/demo-script.md |
 | Xuân Hải | UI prototype + demo script | prototype/, demo/demo-script.md |
 | Minh Kiên | OCR tool, viết doc | tools/ocr_and_check_pill.py |
