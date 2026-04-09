@@ -7,6 +7,7 @@ import requests
 import logging
 import re
 import time
+from functools import lru_cache
 from pathlib import Path
 from typing import Dict, Optional, List, Any
 from langchain.tools import tool
@@ -15,6 +16,10 @@ import pandas as pd
 # Cấu hình logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Simple in-memory cache: tránh gọi FDA API nhiều lần cho cùng một tên thuốc
+_fda_cache: Dict[str, Dict] = {}
+_MAX_CACHE_SIZE = 100
 
 # Hằng số
 FDA_API_BASE_URL = "https://api.fda.gov/drug/label.json"
@@ -148,10 +153,11 @@ def _build_fda_search_terms(user_input: str) -> List[str]:
     _add_term(user_input)
     _add_term(_normalize_drug_name_text(user_input))
 
-    # Tận dụng bộ chuẩn hóa đang có trong interaction checker (RxNorm approximate term)
+    # Tận dụng bộ chuẩn hóa RxNorm — gọi trực tiếp hàm .func() để tránh lỗi StructuredTool
     try:
         from app.tools.check_name_drug import get_us_standard_name
-        standardized = get_us_standard_name(user_input)
+        # get_us_standard_name là LangChain @tool (StructuredTool), dùng .func() để gọi trực tiếp
+        standardized = get_us_standard_name.func(user_input)
         _add_term(standardized)
         _add_term(_normalize_drug_name_text(standardized))
     except Exception as e:
@@ -197,7 +203,8 @@ def _query_openfda_first_result(search_query: str) -> Optional[Dict[str, Any]]:
 def get_full_fda_info(brand_name: str):
     """
     Tra cứu thông tin CHI TIẾT của thuốc từ OpenFDA API.
-    
+    Kết quả được cache in-memory để tránh gọi API nhiều lần cho cùng một thuốc.
+
     Args:
         brand_name (str): Tên thương mại của thuốc (vd: "Advil")
     
@@ -213,6 +220,12 @@ def get_full_fda_info(brand_name: str):
             "success": True
         }
     """
+    # --- Cache check: nếu đã tra cứu thuốc này rồi thì trả kết quả ngay ---
+    cache_key = brand_name.strip().lower()
+    if cache_key in _fda_cache:
+        logger.info("[FDA][CACHE_HIT] input='%s'", brand_name)
+        return _fda_cache[cache_key]
+
     result: Dict[str, Any] = {
         "Hoat_Chat": None,
         "Duong_Dung": None,
@@ -326,6 +339,10 @@ def get_full_fda_info(brand_name: str):
             _short_text(result.get("Chong_Chi_Dinh")),
             _short_text(result.get("Tac_Dung_Phu")),
         )
+
+        # --- Lưu vào cache (giới hạn _MAX_CACHE_SIZE entries) ---
+        if len(_fda_cache) < _MAX_CACHE_SIZE:
+            _fda_cache[cache_key] = result
         
         return result
     
