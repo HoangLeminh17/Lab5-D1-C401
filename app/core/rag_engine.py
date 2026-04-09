@@ -26,6 +26,19 @@ GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-flash")
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
 
 
+def _stream_chunks(text: str, chunk_size: int = 120):
+    for i in range(0, len(text), chunk_size):
+        yield text[i:i + chunk_size]
+
+
+def _invoke_fda_tool(brand_name: str) -> Dict:
+    """Handle LangChain tool invocation in a plain function flow."""
+    try:
+        return get_full_fda_info.invoke({"brand_name": brand_name})
+    except AttributeError:
+        return get_full_fda_info(brand_name)
+
+
 
 
 def get_clinical_recommendation(
@@ -85,7 +98,7 @@ def get_clinical_recommendation(
         
         # Bước 2: Tra cứu FDA API
         logger.info("📍 [Bước 2] Tra cứu FDA API...")
-        fda_info = get_full_fda_info(thuoc_het_hang)
+        fda_info = _invoke_fda_tool(thuoc_het_hang)
         
         if not fda_info["success"]:
             result["error_message"] = f"Không tìm thấy thông tin thuốc '{thuoc_het_hang}' trên FDA API"
@@ -175,6 +188,261 @@ Hãy tư vấn DỰA TRÊN thông tin trên. Dịch các cảnh báo quan trọn
         logger.error(f"❌ {error_msg}")
         result["error_message"] = error_msg
         return result
+
+
+def get_clinical_recommendation_stream(
+    thuoc_het_hang: str,
+    gemini_api_key: Optional[str] = None
+):
+    """
+    Stream workflow events for UI while generating the recommendation.
+    """
+    result = {
+        "brand_name": thuoc_het_hang,
+        "fda_info": None,
+        "alternative_drugs": [],
+        "recommendation": "",
+        "success": False,
+        "error_message": ""
+    }
+
+    try:
+        yield {"type": "status", "message": "Cau hinh Google Gemini"}
+        resolved_api_key = gemini_api_key or GEMINI_API_KEY
+        if not resolved_api_key:
+            result["error_message"] = "Thieu GEMINI_API_KEY. Vui long cau hinh trong file .env"
+            yield {"type": "error", "message": result["error_message"], "result": result}
+            return
+
+        genai.configure(api_key=resolved_api_key)
+
+        yield {"type": "status", "message": "Tra cuu FDA API"}
+        fda_info = _invoke_fda_tool(thuoc_het_hang)
+        if not fda_info.get("success"):
+            result["error_message"] = f"Khong tim thay thong tin thuoc '{thuoc_het_hang}' tren FDA API"
+            yield {"type": "error", "message": result["error_message"], "result": result}
+            return
+
+        result["fda_info"] = fda_info
+        yield {"type": "fda_info", "data": fda_info}
+
+        yield {"type": "status", "message": "Tim thuoc thay the trong database"}
+        active_ingredient = fda_info.get("Hoat_Chat", "Unknown")
+        alternative_drugs = find_alternative_drugs(active_ingredient)
+        result["alternative_drugs"] = alternative_drugs
+        yield {"type": "alternatives", "data": alternative_drugs}
+
+        system_instruction = """Ban la mot DUOC SI LAM SANG CAP CAO voi 20 nam kinh nghiem.
+Nhiem vu cua ban la tu van cac nhan vien quay thuoc khi can tim thuoc thay the.
+
+Hay:
+1. Phan tich hoat chat, duong dung, chi dinh, chong chi dinh cua thuoc goc
+2. So sanh voi cac thuoc thay the co san trong kho
+3. Giai thich ly do lua chon tung thuoc
+4. Canh bao cac diem quan trong (chong chi dinh, tac dung phu) BANG TIENG VIET
+5. Format ket qua ro rang, de doc, su dung Markdown
+
+Luon uu tien an toan benh nhan. Neu co nghi ngo, hay khuyen nghi benh nhan tham khao bac si."""
+
+        model = genai.GenerativeModel(
+            GEMINI_MODEL,
+            system_instruction=system_instruction
+        )
+
+        alternative_drugs_text = ""
+        if alternative_drugs:
+            alternative_drugs_text = "**DANH SACH THUOC CO SAN TRONG KHO:**\n"
+            for i, drug in enumerate(alternative_drugs, 1):
+                alternative_drugs_text += f"\n{i}. **{drug['Ten_Thuoc']}**\n"
+                alternative_drugs_text += f"   - Ton kho: {drug['Ton_Kho']} hop\n"
+        else:
+            alternative_drugs_text = "**LUU Y:** Hien khong co thuoc thay the cung hoat chat trong kho."
+
+        fda_summary = f"""**THONG TIN THUOC GOC (Tu FDA Database - Tieng Anh):**
+
+- **Ten thuong mai:** {thuoc_het_hang}
+- **Hoat chat:** {fda_info.get('Hoat_Chat', 'N/A')}
+- **Duong dung:** {fda_info.get('Duong_Dung', 'N/A')}
+- **Chi dinh:** {fda_info.get('Chi_Dinh', 'N/A')[:200]}...
+- **Chong chi dinh:** {fda_info.get('Chong_Chi_Dinh', 'N/A')[:200]}...
+- **Tac dung phu:** {fda_info.get('Tac_Dung_Phu', 'N/A')[:200]}...
+
+{alternative_drugs_text}"""
+
+        user_message = f"""{fda_summary}
+**YEU CAU:**
+Hay tu van DUA TREN thong tin tren. Dich cac canh bao quan trong sang tieng Viet. Format bang Markdown. Goi y thuoc nao tot nhat va tai sao."""
+
+        for chunk in _stream_chunks(fda_summary, chunk_size=160):
+            yield {"type": "context_chunk", "chunk": chunk}
+
+        response = model.generate_content(
+            user_message,
+            safety_settings=[
+                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+            ]
+        )
+
+        recommendation_text = response.text or ""
+        result["recommendation"] = recommendation_text
+        result["success"] = True
+
+        for chunk in _stream_chunks(recommendation_text, chunk_size=160):
+            yield {"type": "recommendation_chunk", "chunk": chunk}
+
+        yield {"type": "done", "result": result}
+
+    except Exception as e:
+        result["error_message"] = f"Loi trong quy trinh: {str(e)}"
+        yield {"type": "error", "message": result["error_message"], "result": result}
+
+
+def get_drug_explanation_for_pharmacist(
+    brand_name: str,
+    gemini_api_key: Optional[str] = None
+) -> Dict:
+    """Explain a drug in short, pharmacist-friendly Vietnamese."""
+    result = {
+        "brand_name": brand_name,
+        "fda_info": None,
+        "explanation": "",
+        "success": False,
+        "error_message": ""
+    }
+
+    try:
+        resolved_api_key = gemini_api_key or GEMINI_API_KEY
+        if not resolved_api_key:
+            result["error_message"] = "Thieu GEMINI_API_KEY. Vui long cau hinh trong file .env"
+            return result
+
+        genai.configure(api_key=resolved_api_key)
+        fda_info = _invoke_fda_tool(brand_name)
+        if not fda_info.get("success"):
+            result["error_message"] = f"Khong tim thay thong tin thuoc '{brand_name}' tren FDA API"
+            return result
+
+        result["fda_info"] = fda_info
+
+        system_instruction = """Ban la duoc si. Hay giai thich ngan gon, de hieu, tap trung vao:
+1) Hoat chat va tac dung chinh
+2) Luu y quan trong
+3) Doi tuong can canh bao
+
+Tra loi bang tieng Viet, 5-7 dong, dang Markdown."""
+
+        model = genai.GenerativeModel(
+            GEMINI_MODEL,
+            system_instruction=system_instruction
+        )
+
+        user_message = f"""Thong tin FDA (English):
+- Ten thuong mai: {brand_name}
+- Hoat chat: {fda_info.get('Hoat_Chat', 'N/A')}
+- Duong dung: {fda_info.get('Duong_Dung', 'N/A')}
+- Chi dinh: {fda_info.get('Chi_Dinh', 'N/A')[:200]}...
+- Chong chi dinh: {fda_info.get('Chong_Chi_Dinh', 'N/A')[:200]}...
+- Tac dung phu: {fda_info.get('Tac_Dung_Phu', 'N/A')[:200]}...
+
+Hay giai thich de hieu cho duoc si."""
+
+        response = model.generate_content(
+            user_message,
+            safety_settings=[
+                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+            ]
+        )
+
+        result["explanation"] = response.text or ""
+        result["success"] = True
+        return result
+
+    except Exception as e:
+        result["error_message"] = f"Loi trong quy trinh: {str(e)}"
+        return result
+
+
+def get_drug_explanation_for_pharmacist_stream(
+    brand_name: str,
+    gemini_api_key: Optional[str] = None
+):
+    """Stream explanation events for a single drug."""
+    result = {
+        "brand_name": brand_name,
+        "fda_info": None,
+        "explanation": "",
+        "success": False,
+        "error_message": ""
+    }
+
+    try:
+        yield {"type": "status", "message": "Tra cuu FDA API"}
+        resolved_api_key = gemini_api_key or GEMINI_API_KEY
+        if not resolved_api_key:
+            result["error_message"] = "Thieu GEMINI_API_KEY. Vui long cau hinh trong file .env"
+            yield {"type": "error", "message": result["error_message"], "result": result}
+            return
+
+        genai.configure(api_key=resolved_api_key)
+        fda_info = _invoke_fda_tool(brand_name)
+        if not fda_info.get("success"):
+            result["error_message"] = f"Khong tim thay thong tin thuoc '{brand_name}' tren FDA API"
+            yield {"type": "error", "message": result["error_message"], "result": result}
+            return
+
+        result["fda_info"] = fda_info
+        yield {"type": "fda_info", "data": fda_info}
+
+        system_instruction = """Ban la duoc si. Hay giai thich ngan gon, de hieu, tap trung vao:
+1) Hoat chat va tac dung chinh
+2) Luu y quan trong
+3) Doi tuong can canh bao
+
+Tra loi bang tieng Viet, 5-7 dong, dang Markdown."""
+
+        model = genai.GenerativeModel(
+            GEMINI_MODEL,
+            system_instruction=system_instruction
+        )
+
+        user_message = f"""Thong tin FDA (English):
+- Ten thuong mai: {brand_name}
+- Hoat chat: {fda_info.get('Hoat_Chat', 'N/A')}
+- Duong dung: {fda_info.get('Duong_Dung', 'N/A')}
+- Chi dinh: {fda_info.get('Chi_Dinh', 'N/A')[:200]}...
+- Chong chi dinh: {fda_info.get('Chong_Chi_Dinh', 'N/A')[:200]}...
+- Tac dung phu: {fda_info.get('Tac_Dung_Phu', 'N/A')[:200]}...
+
+Hay giai thich de hieu cho duoc si."""
+
+        response = model.generate_content(
+            user_message,
+            safety_settings=[
+                {"category": "HARM_CATEGORY_HARASSMENT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_HATE_SPEECH", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_SEXUALLY_EXPLICIT", "threshold": "BLOCK_NONE"},
+                {"category": "HARM_CATEGORY_DANGEROUS_CONTENT", "threshold": "BLOCK_NONE"},
+            ]
+        )
+
+        explanation_text = response.text or ""
+        result["explanation"] = explanation_text
+        result["success"] = True
+
+        for chunk in _stream_chunks(explanation_text, chunk_size=140):
+            yield {"type": "explanation_chunk", "chunk": chunk}
+
+        yield {"type": "done", "result": result}
+
+    except Exception as e:
+        result["error_message"] = f"Loi trong quy trinh: {str(e)}"
+        yield {"type": "error", "message": result["error_message"], "result": result}
 
 
 if __name__ == "__main__":
