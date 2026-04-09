@@ -9,7 +9,7 @@ if __package__ is None or __package__ == "":
 
 from langchain_google_genai import ChatGoogleGenerativeAI
 from app.tools.fda import get_full_fda_info
-from app.tools.interaction_checker import check_interaction_rxnav
+from app.tools.interaction_checker import check_interaction_openfda
 from langchain.agents import create_agent
 from app.core.config import CLINICAL_SYSTEM_PROMPT, get_core_config
 
@@ -17,7 +17,7 @@ CORE_CONFIG = get_core_config()
 
 system_prompt = CLINICAL_SYSTEM_PROMPT
 # Danh sách tools cho Agent
-tools = [get_full_fda_info, check_interaction_rxnav]
+tools = [get_full_fda_info, check_interaction_openfda]
 
 # LLM hỗ trợ gọi tool (function calling)
 llm = ChatGoogleGenerativeAI(
@@ -32,14 +32,38 @@ agent_executor = create_agent(
     tools = tools
 )
 
+
 def run_clinical_agent(query: str) -> str:
     """Hàm chạy agent để trả lời câu hỏi của người dùng"""
     try:
         inputs = {"messages": [("user", query)]}
         response = agent_executor.invoke(inputs)
 
-        # Trả về tin nhắn cuối cùng từ agent
-        return response["messages"][-1].content
+        # Lấy nội dung tin nhắn cuối cùng từ agent
+        content = response["messages"][-1].content
+
+        # --- BẮT ĐẦU ĐOẠN SỬA LỖI FORMAT ---
+        # Nếu content là một List (chứa cấu trúc JSON của Gemini)
+        if isinstance(content, list):
+            final_text = ""
+            for item in content:
+                # Trích xuất phần tử có chứa key 'text'
+                if isinstance(item, dict) and "text" in item:
+                    final_text += item["text"] + "\n"
+                # Đề phòng trường hợp phần tử là chữ thuần
+                elif isinstance(item, str):
+                    final_text += item + "\n"
+            return final_text.strip()
+
+        # Nếu content đã là một chuỗi (string) bình thường thì trả về luôn
+        elif isinstance(content, str):
+            return content
+
+        # Các trường hợp dị biệt khác (fallback)
+        else:
+            return str(content)
+        # --- KẾT THÚC ĐOẠN SỬA LỖI FORMAT ---
+
     except Exception as e:
         return f"Lỗi khi chạy agent: {str(e)}"
 
